@@ -1,89 +1,88 @@
-# statistics.py calculates statistical values for groups and subgroups based on their diagnosis and target
-# statistics are written to .csv files and can be used for further analysis, Author: yhashim 
+'''
+Created July 2023
+statistics.py
+This code calculates statistics for groups based on diagnosis and target, which are written to csv files for analysis.
+'''
+
 import csv
 import math
-
 from scipy.stats import differential_entropy
 
+# File names are based on subject number and recording hemisphere
 file_names = ['002left_LFP', '002right_LFP', '003right_LFP', '004left_LFP', '004right_LFP', '005right_LFP', '006left_LFP', '006right_LFP', '007left_LFP', '007right_LFP', '008left_LFP', '009left_LFP', '010left_LFP', '010right_LFP']
 
+# Lists for groups based on disease and sensing frequency
 complete_list = []
-
-allPD_alpha, allPD_beta = [], []
-
-allPD_STN_beta, allPD_STN_alpha = [], []
-allPD_GPI_beta, allPD_GPI_alpha = [], []
-
+allPD_alpha = []
+allPD_beta = []
+allPD_STN_beta = []
+allPD_STN_alpha = []
+allPD_GPI_beta = []
+allPD_GPI_alpha = []
 allNonPD_alpha = []
-
-allNonPD_STN_alpha, allNonPD_GPI_alpha = [], []
-
+allNonPD_STN_alpha = []
+allNonPD_GPI_alpha = []
 allET_alpha = []
 
-def calculate_mean(data):
+# Functions for calculating statistical measures (mean, standard deviation or variance, and differential entropy)
+def calculate_mean(stage, stage_name):
     try:
-        return sum([float(row[1]) for row in data]) / len(data)
+        return sum(float(row[1]) for row in stage) / len(stage)
     except Exception as e:
-        print("mean error raised is:", e)
-        return 'NULL'
+        print(f"Error calculating mean for {stage_name}: {e}")
+        return None
 
-def calculate_std(data, mean):
+def calculate_std(stage, mean, stage_name):
     try:
-        return (sum([(float(row[1]) - mean)**2 for row in data]) / len(data)) ** 0.5
+        return (sum((float(row[1]) - mean)**2 for row in stage) / len(stage))**0.5
     except Exception as e:
-        print("standard deviation error raised is:", e)
-        return 'NULL'
+        print(f"Error calculating standard deviation for {stage_name}: {e}")
+        return None
 
-def calculate_var(std):
+def calculate_variance(std, stage_name):
     try:
-        return std ** 2
+        return std**2
     except Exception as e:
-        print("variance error raised is:", e)
-        return 'NULL'
-    
-def calculate_stage_data(data, stage_name, stage_number, sleep_or_wake, mean, std, var, entropy):
-    stage_lfps = [float(row[1]) for row in data]
-    try:
-        entropy_value = differential_entropy(stage_lfps)
-    except Exception as e:
-        print(f"{stage_name} differential entropy error raised is:", e)
-        entropy_value = 'NULL'
-    
-    return [stage_name, stage_number, sleep_or_wake, mean, 'N/A', 'N/A', std, var, entropy_value]
+        print(f"Error calculating variance for {stage_name}: {e}")
+        return None
 
-def get_comparison(mean, wake_mean):
+def calculate_differential_entropy(lfps, stage_name):
     try:
-        if mean > wake_mean:
+        return differential_entropy(lfps)
+    except Exception as e:
+        print(f"Error calculating differential entropy for {stage_name}: {e}")
+        return None
+
+# Returns the frequency of the LFP of the stage
+def extract_lfps(stage):
+    return [float(row[1]) for row in stage]
+
+# Compare stage mean with the wake mean
+def compare_means(stage_mean, wake_mean, stage_name):
+    try:
+        if stage_mean > wake_mean:
             return 'greater'
-        elif mean < wake_mean:
+        elif stage_mean < wake_mean:
             return 'less'
         else:
             return 'equal'
     except Exception as e:
-        print("error raised is: ", e)
-        return 'N/A'
+        print(f"Error comparing {stage_name} mean with wake mean: {e}")
+        return None
 
-def calculate_difference(stage_mean, wake_mean):
+# Returns the difference between a stage mean and the wake mean
+def calculate_difference(stage_mean, wake_mean, stage_name):
     try:
         return stage_mean - wake_mean
     except Exception as e:
-        print("error raised is: ", e)
-        return 'NULL'
+        print(f"Error calculating difference for {stage_name}: {e}")
+        return None
 
-
-def write_to_csv(filename, data):
-    with open(filename, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['Subject Number', 'Frequency Band', 'Stage', 'Stage Number', 'Sleep or Wake', 'Mean', 'Wake Comparison', 'Wake Difference', 'Standard Deviation', 'Variance', 'Entropy'])
-        writer.writerows(data)
-
-
+# Iterates through each file from the file_names list and calculates statistics for sleep stages
 for file_name in file_names:
     current_csv = file_name + '.csv'
     subject_n = int(current_csv[0:3])
 
-    # read csv file and store in list
-    # skip first row
     with open(current_csv, 'r') as f:
         reader = csv.reader(f)
         next(reader)
@@ -91,8 +90,7 @@ for file_name in file_names:
 
     frequency_band = data[0][5]
 
-    wake, restless, light, deep, rem = [], [], [], [], []
-    sleepAdd = []
+    wake = restless = light = deep = rem = sleepAdd = []
 
     for row in data:
         if row[2] == '0':
@@ -110,59 +108,70 @@ for file_name in file_names:
 
     sleep = restless + light + deep + rem + sleepAdd
 
-    wake_mean = restless_mean = light_mean = deep_mean = rem_mean = sleep_mean = 'NULL'
-    wake_std = restless_std = light_std = deep_std = rem_std = sleep_std = 'NULL'
-    wake_var = restless_var = light_var = deep_var = rem_var = sleep_var = 'NULL'
-    wake_entropy = restless_entropy = light_entropy = deep_entropy = rem_entropy = sleep_entropy = 'NULL'
+    # Initialize variables with 'NULL'
+    wake_mean = wake_std = wake_var = wake_entropy = 'NULL'
+    restless_mean = restless_comparison = restless_difference = restless_std = restless_var = restless_entropy = 'NULL'
+    light_mean = light_comparison = light_difference = light_std = light_var = light_entropy = 'NULL'
+    deep_mean = deep_comparison = deep_difference = deep_std = deep_var = deep_entropy = 'NULL'
+    rem_mean = rem_comparison = rem_difference = rem_std = rem_var = rem_entropy = 'NULL'
+    sleep_mean = sleep_comparison = sleep_difference = sleep_std = sleep_var = sleep_entropy = 'NULL'
 
-    wake_mean = calculate_mean(wake)
-    restless_mean = calculate_mean(restless)
-    light_mean = calculate_mean(light)
-    deep_mean = calculate_mean(deep)
-    rem_mean = calculate_mean(rem)
-    sleep_mean = calculate_mean(sleep)
+    # Calculate statistics for each stage
+    # Mean
+    wake_mean = calculate_mean(wake, "wake")
+    restless_mean = calculate_mean(restless, "restless")
+    light_mean = calculate_mean(light, "light")
+    deep_mean = calculate_mean(deep, "deep")
+    rem_mean = calculate_mean(rem, "REM")
+    sleep_mean = calculate_mean(sleep, "sleep")
 
-    wake_std = calculate_std(wake, wake_mean)
-    restless_std = calculate_std(restless, restless_mean)
-    light_std = calculate_std(light, light_mean)
-    deep_std = calculate_std(deep, deep_mean)
-    rem_std = calculate_std(rem, rem_mean)
-    sleep_std = calculate_std(sleep, sleep_mean)
+    # Standard deviation
+    wake_std = calculate_std(wake, wake_mean, "wake")
+    restless_std = calculate_std(restless, restless_mean, "restless")
+    light_std = calculate_std(light, light_mean, "light")
+    deep_std = calculate_std(deep, deep_mean, "deep")
+    rem_std = calculate_std(rem, rem_mean, "REM")
+    sleep_std = calculate_std(sleep, sleep_mean, "sleep")
 
-    wake_var = calculate_var(wake_std)
-    restless_var = calculate_var(restless_std)
-    light_var = calculate_var(light_std)
-    deep_var = calculate_var(deep_std)
-    rem_var = calculate_var(rem_std)
-    sleep_var = calculate_var(sleep_std)    
+    # Variance
+    wake_var = calculate_variance(wake_std, "wake")
+    restless_var = calculate_variance(restless_std, "restless")
+    light_var = calculate_variance(light_std, "light")
+    deep_var = calculate_variance(deep_std, "deep")
+    rem_var = calculate_variance(rem_std, "REM")
+    sleep_var = calculate_variance(sleep_std, "sleep")
 
-    wake_lfps, restless_lfps, light_lfps, deep_lfps, rem_lfps, sleep_lfps = [], [], [], [], [], []
-    for row in wake:
-        wake_lfps.append(float(row[1]))
-    for row in restless:
-        restless_lfps.append(float(row[1]))
-    for row in light:
-        light_lfps.append(float(row[1]))
-    for row in deep:
-        deep_lfps.append(float(row[1]))
-    for row in rem:
-        rem_lfps.append(float(row[1]))
-    for row in sleep:
-        sleep_lfps.append(float(row[1]))
+    # Differential entropy
+    wake_entropy = calculate_differential_entropy(wake_lfps, "wake")
+    restless_entropy = calculate_differential_entropy(restless_lfps, "restless")
+    light_entropy = calculate_differential_entropy(light_lfps, "light")
+    deep_entropy = calculate_differential_entropy(deep_lfps, "deep")
+    rem_entropy = calculate_differential_entropy(rem_lfps, "REM")
+    sleep_entropy = calculate_differential_entropy(sleep_lfps, "sleep")
 
-    restrestless_comparison = get_comparison(restless_mean, wake_mean)
-    light_comparison = get_comparison(light_mean, wake_mean)
-    deep_comparison = get_comparison(deep_mean, wake_mean)
-    rem_comparison = get_comparison(rem_mean, wake_mean)
-    sleep_comparison = get_comparison(sleep_mean, wake_mean)
+    # Get the stage's LFP frequency
+    wake_lfps = extract_lfps(wake)
+    restless_lfps = extract_lfps(restless)
+    light_lfps = extract_lfps(light)
+    deep_lfps = extract_lfps(deep)
+    rem_lfps = extract_lfps(rem)
+    sleep_lfps = extract_lfps(sleep)
 
-    restless_difference = calculate_difference(restless_mean, wake_mean)
-    light_difference = calculate_difference(light_mean, wake_mean)
-    deep_difference = calculate_difference(deep_mean, wake_mean)
-    rem_difference = calculate_difference(rem_mean, wake_mean)
-    sleep_difference = calculate_difference(sleep_mean, wake_mean)
+    # Compare each stage mean with the wake mean
+    restless_comparison = compare_means(restless_mean, wake_mean, "restless")
+    light_comparison = compare_means(light_mean, wake_mean, "light")
+    deep_comparison = compare_means(deep_mean, wake_mean, "deep")
+    rem_comparison = compare_means(rem_mean, wake_mean, "REM")
+    sleep_comparison = compare_means(sleep_mean, wake_mean, "sleep")
 
-    # write results to new csv file summarizing each stage's statistics in individual rows
+    # Difference between each stage mean and the wake mean
+    restless_difference = calculate_difference(restless_mean, wake_mean, "restless")
+    light_difference = calculate_difference(light_mean, wake_mean, "light")
+    deep_difference = calculate_difference(deep_mean, wake_mean, "deep")
+    rem_difference = calculate_difference(rem_mean, wake_mean, "REM")
+    sleep_difference = calculate_difference(sleep_mean, wake_mean, "sleep")
+
+    # Write all results to new spreadsheet summarizing each stage's statistics
     with open(current_csv[0:3] + frequency_band + '_statistics.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['Stage', 'Stage Number', 'Sleep or Wake', 'Mean', 'Wake Comparison', 'Wake Difference', 'Standard Deviation', 'Variance', 'Entropy'])
@@ -180,23 +189,9 @@ for file_name in file_names:
     complete_list.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
     complete_list.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
 
-    # beta:
-    # pd: 002left, 003right, 004left, 007right, 010right
-    # non-pd: 006right (no)
-
-    # alpha: 
-    # pd: 002right, 004right, 005right, 007left, 010left
-    # non-pd: 006left, 008left, 009left
-
-    # pd: 
-    # stn: 002, 003, 005, 010
-    # gpi: 004, 007
-
-    # nonpd: 
-    # gpi: 006
-    # vim: 008, 009 
-
+    # Write spreadsheets for each diagnosis, target, and frequency group
     if frequency_band == 'alpha':
+        # Parkinson's disease group which had alpha recordings
         if subject_n == 2 or subject_n == 4 or subject_n == 5 or subject_n == 7 or subject_n == 10:
             allPD_alpha.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
             allPD_alpha.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -204,6 +199,7 @@ for file_name in file_names:
             allPD_alpha.append([subject_n, frequency_band, 'Deep', 3, 1, deep_mean, deep_comparison, deep_difference, deep_std, deep_var, deep_entropy])
             allPD_alpha.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
             allPD_alpha.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
+            # Specifically with subthalamic nucleus target
             if subject_n == 2 or subject_n == 5 or subject_n == 10:
                 allPD_STN_alpha.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
                 allPD_STN_alpha.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -211,6 +207,7 @@ for file_name in file_names:
                 allPD_STN_alpha.append([subject_n, frequency_band, 'Deep', 3, 1, deep_mean, deep_comparison, deep_difference, deep_std, deep_var, deep_entropy])
                 allPD_STN_alpha.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
                 allPD_STN_alpha.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
+            # Specifically with globus pallidus internus target
             elif subject_n == 4 or subject_n == 7:
                 allPD_GPI_alpha.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
                 allPD_GPI_alpha.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -218,6 +215,7 @@ for file_name in file_names:
                 allPD_GPI_alpha.append([subject_n, frequency_band, 'Deep', 3, 1, deep_mean, deep_comparison, deep_difference, deep_std, deep_var, deep_entropy])
                 allPD_GPI_alpha.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
                 allPD_GPI_alpha.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
+        # Non-Parkinson's disease group which had alpha recordings
         elif subject_n == 6 or subject_n == 8 or subject_n == 9:
             allNonPD_alpha.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
             allNonPD_alpha.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -226,6 +224,7 @@ for file_name in file_names:
             allNonPD_alpha.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
             allNonPD_alpha.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
     else:
+        # Parkinson's disease group which had beta recordings
         if subject_n == 2 or subject_n == 3 or subject_n == 4 or subject_n == 7 or subject_n == 10:
             allPD_beta.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
             allPD_beta.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -233,6 +232,7 @@ for file_name in file_names:
             allPD_beta.append([subject_n, frequency_band, 'Deep', 3, 1, deep_mean, deep_comparison, deep_difference, deep_std, deep_var, deep_entropy])
             allPD_beta.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
             allPD_beta.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
+            # Specifically with subthalamic nucleus target
             if subject_n == 2 or subject_n == 3 or subject_n == 10:
                 allPD_STN_beta.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
                 allPD_STN_beta.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -240,6 +240,7 @@ for file_name in file_names:
                 allPD_STN_beta.append([subject_n, frequency_band, 'Deep', 3, 1, deep_mean, deep_comparison, deep_difference, deep_std, deep_var, deep_entropy])
                 allPD_STN_beta.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
                 allPD_STN_beta.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
+            # Specifically with globus pallidus internus target
             elif subject_n == 4 or subject_n == 7:
                 allPD_GPI_beta.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
                 allPD_GPI_beta.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -247,7 +248,7 @@ for file_name in file_names:
                 allPD_GPI_beta.append([subject_n, frequency_band, 'Deep', 3, 1, deep_mean, deep_comparison, deep_difference, deep_std, deep_var, deep_entropy])
                 allPD_GPI_beta.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
                 allPD_GPI_beta.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
-    
+    # Essential tremor group which only had alpha recoridngs
     if subject_n == 8 or subject_n == 9:
         allET_alpha.append([subject_n, frequency_band, 'Wake', 0, 0, wake_mean, 'N/A', 'N/A', wake_std, wake_var, wake_entropy])
         allET_alpha.append([subject_n, frequency_band, 'Restless', 1, 1, restless_mean, restless_comparison, restless_difference, restless_std, restless_var, restless_entropy])
@@ -255,6 +256,13 @@ for file_name in file_names:
         allET_alpha.append([subject_n, frequency_band, 'Deep', 3, 1, deep_mean, deep_comparison, deep_difference, deep_std, deep_var, deep_entropy])
         allET_alpha.append([subject_n, frequency_band, 'REM', 4, 1, rem_mean, rem_comparison, rem_difference, rem_std, rem_var, rem_entropy])
         allET_alpha.append([subject_n, frequency_band, 'Sleep', 5, 1, sleep_mean, sleep_comparison, sleep_difference, sleep_std, sleep_var, sleep_entropy])
+
+# Writes the statistics for a disease group and frequency to a spreadsheet
+def write_to_csv(filename, data):
+    with open(filename, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['Subject Number', 'Frequency Band', 'Stage', 'Stage Number', 'Sleep or Wake', 'Mean', 'Wake Comparison', 'Wake Difference', 'Standard Deviation', 'Variance', 'Entropy'])
+        writer.writerows(data)
 
 write_to_csv('statistics.csv', complete_list)
 write_to_csv('allPD_alpha.csv', allPD_alpha)
